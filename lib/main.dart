@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'providers/study_plan_provider.dart';
 import 'providers/homework_provider.dart';
 import 'providers/user_stats_provider.dart';
+import 'providers/subject_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
 
@@ -52,6 +53,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StudyPlanProvider()),
         ChangeNotifierProvider(create: (_) => HomeworkProvider()),
         ChangeNotifierProvider(create: (_) => UserStatsProvider()),
+        ChangeNotifierProvider(create: (_) => SubjectProvider()),
       ],
       child: MaterialApp(
         title: 'StudyGo',

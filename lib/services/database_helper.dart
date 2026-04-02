@@ -5,6 +5,7 @@ import '../models/study_plan.dart';
 import '../models/homework.dart';
 import '../models/achievement.dart';
 import '../models/user_stats.dart';
+import '../models/subject.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -22,7 +23,25 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(path, version: 2, onCreate: _createDB, onUpgrade: _upgradeDB);
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createSubjectsTable(db);
+      await _insertDefaultSubjects(db);
+    }
+  }
+
+  Future _createSubjectsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        colorValue INTEGER NOT NULL,
+        isBuiltIn INTEGER NOT NULL
+      )
+    ''');
   }
 
   Future _createDB(Database db, int version) async {
@@ -76,6 +95,29 @@ class DatabaseHelper {
     await _insertInitialAchievements(db);
     // Başlangıç istatistikleri ekle
     await _insertInitialStats(db);
+    // Dersler tablosu
+    await _createSubjectsTable(db);
+    await _insertDefaultSubjects(db);
+  }
+
+  Future _insertDefaultSubjects(Database db) async {
+    final defaultSubjects = [
+      Subject(name: 'Matematik', colorValue: 0xFFE53935, isBuiltIn: true),
+      Subject(name: 'Türkçe', colorValue: 0xFFFF6F00, isBuiltIn: true),
+      Subject(name: 'İngilizce', colorValue: 0xFF1E88E5, isBuiltIn: true),
+      Subject(name: 'Fen Bilgisi', colorValue: 0xFF43A047, isBuiltIn: true),
+      Subject(name: 'Sosyal Bilgiler', colorValue: 0xFF7B1FA2, isBuiltIn: true),
+      Subject(name: 'Din Kültürü', colorValue: 0xFF0097A7, isBuiltIn: true),
+      Subject(name: 'Bilişim Teknolojileri', colorValue: 0xFF3F51B5, isBuiltIn: true),
+      Subject(name: 'Teknoloji ve Tasarım', colorValue: 0xFF00BCD4, isBuiltIn: true),
+      Subject(name: 'Beden Eğitimi', colorValue: 0xFF7CB342, isBuiltIn: true),
+      Subject(name: 'Müzik', colorValue: 0xFFEC407A, isBuiltIn: true),
+      Subject(name: 'Resim', colorValue: 0xFFFFA000, isBuiltIn: true),
+    ];
+
+    for (final subject in defaultSubjects) {
+      await db.insert('subjects', subject.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
   }
 
   Future _insertInitialAchievements(Database db) async {
@@ -214,6 +256,27 @@ class DatabaseHelper {
       stats.toMap()..['id'] = 1,
       where: 'id = ?',
       whereArgs: [1],
+    );
+  }
+
+  // Subjects
+  Future<List<Subject>> getSubjects() async {
+    final db = await instance.database;
+    final result = await db.query('subjects', orderBy: 'isBuiltIn DESC, name ASC');
+    return result.map((json) => Subject.fromMap(json)).toList();
+  }
+
+  Future<int> insertSubject(Subject subject) async {
+    final db = await instance.database;
+    return await db.insert('subjects', subject.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<int> deleteSubject(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'subjects',
+      where: 'id = ? AND isBuiltIn = 0',
+      whereArgs: [id],
     );
   }
 

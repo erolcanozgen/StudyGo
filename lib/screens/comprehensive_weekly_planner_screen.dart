@@ -7,6 +7,7 @@ import '../models/homework.dart';
 import '../models/weekly_schedule_config.dart';
 import '../providers/study_plan_provider.dart';
 import '../providers/homework_provider.dart';
+import '../providers/subject_provider.dart';
 
 class ComprehensiveWeeklyPlannerScreen extends StatefulWidget {
   @override
@@ -36,6 +37,7 @@ class _ComprehensiveWeeklyPlannerScreenState
     _selectedDay = DateTime.now();
     _initializeConfig();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<SubjectProvider>().loadSubjects();
       await context.read<StudyPlanProvider>().loadStudyPlans();
       await context.read<HomeworkProvider>().loadHomeworks();
     });
@@ -63,19 +65,9 @@ class _ComprehensiveWeeklyPlannerScreenState
     _lessonDuration = 90;
   }
 
-  Map<String, Color> _subjectColors = {
-    'Matematik': Color(0xFFE53935),
-    'Türkçe': Color(0xFFFF6F00),
-    'İngilizce': Color(0xFF1E88E5),
-    'Fen Bilgisi': Color(0xFF43A047),
-    'Sosyal Bilgiler': Color(0xFF7B1FA2),
-    'Din Kültürü': Color(0xFF0097A7),
-    'Bilişim Teknolojileri': Color(0xFF3F51B5),
-    'Teknoloji ve Tasarım': Color(0xFF00BCD4),
-    'Beden Eğitimi': Color(0xFF7CB342),
-    'Müzik': Color(0xFFEC407A),
-    'Resim': Color(0xFFFFA000),
-  };
+  Map<String, Color> get _subjectColors {
+    return context.read<SubjectProvider>().subjectColorMap;
+  }
 
   List<StudyPlan> _getPlansForDay(DateTime day) {
     final plans = context.watch<StudyPlanProvider>().studyPlans;
@@ -337,19 +329,11 @@ class _ComprehensiveWeeklyPlannerScreenState
   }
 
   Widget _buildSubjectSelector() {
-    List<String> allSubjects = [
-      'Matematik',
-      'Türkçe',
-      'İngilizce',
-      'Fen Bilgisi',
-      'Sosyal Bilgiler',
-      'Din Kültürü',
-      'Bilişim Teknolojileri',
-      'Teknoloji ve Tasarım',
-      'Beden Eğitimi',
-      'Müzik',
-      'Resim',
-    ];
+    List<String> allSubjects = context.watch<SubjectProvider>().subjectNames;
+    if (allSubjects.isEmpty) {
+      allSubjects = ['Matematik', 'Türkçe', 'İngilizce', 'Fen Bilgisi', 'Sosyal Bilgiler',
+        'Din Kültürü', 'Bilişim Teknolojileri', 'Teknoloji ve Tasarım', 'Beden Eğitimi', 'Müzik', 'Resim'];
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1059,7 +1043,8 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
   }
 
   Widget _buildAddLessonForm() {
-    TextEditingController lessonController = TextEditingController();
+    final subjectNames = context.read<SubjectProvider>().subjectNames;
+    String? selectedLesson;
     TextEditingController descriptionController = TextEditingController();
     TimeOfDay startTime = TimeOfDay(hour: 8, minute: 0);
     TimeOfDay endTime = TimeOfDay(hour: 9, minute: 30);
@@ -1070,15 +1055,20 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
           padding: EdgeInsets.all(16),
           child: Column(
             children: [
-              TextField(
-                controller: lessonController,
+              DropdownButtonFormField<String>(
+                value: selectedLesson,
                 decoration: InputDecoration(
-                  labelText: 'Ders Adı',
+                  labelText: 'Ders',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   prefixIcon: Icon(Icons.school),
                 ),
+                items: subjectNames.map((name) => DropdownMenuItem(
+                  value: name,
+                  child: Text(name),
+                )).toList(),
+                onChanged: (value) => setState(() => selectedLesson = value),
               ),
               SizedBox(height: 12),
               TextField(
@@ -1155,10 +1145,10 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    if (lessonController.text.isNotEmpty) {
+                    if (selectedLesson != null && selectedLesson!.isNotEmpty) {
                       try {
                         await widget.onAddPlan(
-                          lessonController.text,
+                          selectedLesson!,
                           startTime,
                           endTime,
                           descriptionController.text,
@@ -1168,7 +1158,7 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
                       }
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('⚠️ Ders adı boş olamaz')),
+                        SnackBar(content: Text('⚠️ Ders seçiniz')),
                       );
                     }
                   },
@@ -1193,7 +1183,8 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
   }
 
   Widget _buildAddHomeworkForm() {
-    TextEditingController subjectController = TextEditingController();
+    final subjectNames = context.read<SubjectProvider>().subjectNames;
+    String? selectedSubject;
     TextEditingController descriptionController = TextEditingController();
     String selectedPriority = 'Orta';
     DateTime dueDate = DateTime.now().add(Duration(days: 1));
@@ -1204,15 +1195,20 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
           padding: EdgeInsets.all(16),
           child: Column(
             children: [
-              TextField(
-                controller: subjectController,
+              DropdownButtonFormField<String>(
+                value: selectedSubject,
                 decoration: InputDecoration(
-                  labelText: 'Ders / Konu',
+                  labelText: 'Ders',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   prefixIcon: Icon(Icons.book),
                 ),
+                items: subjectNames.map((name) => DropdownMenuItem(
+                  value: name,
+                  child: Text(name),
+                )).toList(),
+                onChanged: (value) => setState(() => selectedSubject = value),
               ),
               SizedBox(height: 12),
               TextField(
@@ -1288,11 +1284,11 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    if (subjectController.text.isNotEmpty &&
+                    if (selectedSubject != null && selectedSubject!.isNotEmpty &&
                         descriptionController.text.isNotEmpty) {
                       try {
                         await widget.onAddHomework(
-                          subjectController.text,
+                          selectedSubject!,
                           descriptionController.text,
                           dueDate,
                           selectedPriority,

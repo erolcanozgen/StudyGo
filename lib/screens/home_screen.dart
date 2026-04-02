@@ -4,6 +4,7 @@ import '../providers/user_stats_provider.dart';
 import '../screens/achievements_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/comprehensive_weekly_planner_screen.dart';
+import '../screens/subjects_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -103,6 +104,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             () => Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => ComprehensiveWeeklyPlannerScreen()),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildMenuCard(
+                            context,
+                            '📚 Dersler',
+                            'Derslerini yönet',
+                            Colors.teal,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SubjectsScreen()),
                             ),
                           ),
                         ),

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/homework.dart';
 import '../providers/homework_provider.dart';
 import '../providers/user_stats_provider.dart';
+import '../providers/subject_provider.dart';
 import '../services/notification_service.dart';
 
 class HomeworkScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
     // Ödevleri yükle
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomeworkProvider>().loadHomeworks();
+      context.read<SubjectProvider>().loadSubjects();
     });
   }
 
@@ -228,7 +230,11 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
   }
 
   void _showHomeworkDialog(Homework? homework) {
-    final subjectController = TextEditingController(text: homework?.subject ?? '');
+    final subjectNames = context.read<SubjectProvider>().subjectNames;
+    String? selectedSubject = homework?.subject;
+    if (selectedSubject != null && !subjectNames.contains(selectedSubject)) {
+      subjectNames.add(selectedSubject);
+    }
     final descriptionController = TextEditingController(text: homework?.description ?? '');
     DateTime dueDate = homework?.dueDate ?? DateTime.now().add(const Duration(days: 1));
     int priority = homework?.priority ?? 2;
@@ -242,12 +248,16 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: subjectController,
+                DropdownButtonFormField<String>(
+                  value: selectedSubject,
                   decoration: const InputDecoration(
-                    labelText: 'Ders Adı',
-                    hintText: 'Matematik, Türkçe, vb.',
+                    labelText: 'Ders',
                   ),
+                  items: subjectNames.map((name) => DropdownMenuItem(
+                    value: name,
+                    child: Text(name),
+                  )).toList(),
+                  onChanged: (value) => setState(() => selectedSubject = value),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -317,10 +327,10 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (subjectController.text.isNotEmpty) {
+                if (selectedSubject != null && selectedSubject!.isNotEmpty) {
                   final newHomework = Homework(
                     id: homework?.id,
-                    subject: subjectController.text,
+                    subject: selectedSubject!,
                     description: descriptionController.text,
                     dueDate: dueDate,
                     isCompleted: homework?.isCompleted ?? false,
