@@ -229,8 +229,19 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
     _showHomeworkDialog(homework);
   }
 
-  void _showHomeworkDialog(Homework? homework) {
-    final subjectNames = context.read<SubjectProvider>().subjectNames;
+  void _showHomeworkDialog(Homework? homework) async {
+    final subjectProvider = context.read<SubjectProvider>();
+    if (subjectProvider.subjectNames.isEmpty) {
+      await subjectProvider.loadSubjects();
+    }
+    final subjectNames = List<String>.from(subjectProvider.subjectNames);
+    if (subjectNames.isEmpty) {
+      subjectNames.addAll([
+        'Matematik', 'Türkçe', 'Fen Bilimleri', 'Sosyal Bilgiler',
+        'İngilizce', 'Din Kültürü', 'Müzik', 'Görsel Sanatlar',
+        'Beden Eğitimi', 'Teknoloji ve Tasarım', 'Bilişim',
+      ]);
+    }
     String? selectedSubject = homework?.subject;
     if (selectedSubject != null && !subjectNames.contains(selectedSubject)) {
       subjectNames.add(selectedSubject);
@@ -381,15 +392,19 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
   }
 
   Future<void> _scheduleHomeworkReminder(Homework homework) async {
-    final reminderTime = homework.dueDate.subtract(const Duration(hours: 24)); // 1 gün önce hatırlat
+    try {
+      final reminderTime = homework.dueDate.subtract(const Duration(hours: 24));
 
-    if (reminderTime.isAfter(DateTime.now())) {
-      await NotificationService().scheduleHomeworkReminder(
-        id: homework.id!,
-        title: '📝 Ödev Hatırlatma',
-        body: '${homework.subject} ödevinin teslim tarihi yaklaşıyor!',
-        scheduledTime: reminderTime,
-      );
+      if (reminderTime.isAfter(DateTime.now())) {
+        await NotificationService().scheduleHomeworkReminder(
+          id: homework.id!,
+          title: '📝 Ödev Hatırlatma',
+          body: '${homework.subject} ödevinin teslim tarihi yaklaşıyor!',
+          scheduledTime: reminderTime,
+        );
+      }
+    } catch (e) {
+      print('Homework reminder error: $e');
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
@@ -11,11 +12,18 @@ class NotificationService {
 
   Future<void> init() async {
     try {
+      // Timezone başlat
+      tz_data.initializeTimeZones();
+
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
 
       const DarwinInitializationSettings initializationSettingsIOS =
-          DarwinInitializationSettings();
+          DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
       const InitializationSettings initializationSettings = InitializationSettings(
         android: initializationSettingsAndroid,
@@ -28,6 +36,16 @@ class NotificationService {
           // Bildirime tıklandığında yapılacak işlemler
         },
       );
+
+      // iOS izin iste
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
     } catch (e) {
       print('Notification initialization error: $e');
     }
@@ -54,7 +72,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
@@ -81,7 +99,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
