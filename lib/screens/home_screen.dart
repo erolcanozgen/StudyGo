@@ -1,12 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_stats_provider.dart';
-import '../screens/plan_screen.dart';
-import '../screens/homework_screen.dart';
 import '../screens/achievements_screen.dart';
 import '../screens/settings_screen.dart';
-import '../screens/weekly_schedule_generator_screen.dart';
-import '../screens/weekly_calendar_screen.dart';
 import '../screens/comprehensive_weekly_planner_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -94,64 +90,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
 
                   // Ana menü butonları
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    children: [
-                      _buildMenuCard(
-                        context,
-                        '📅 Ders Planı',
-                        'Günlük çalışma planını oluştur',
-                        Colors.blue,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PlanScreen()),
+                  SizedBox(
+                    height: 120,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildMenuCard(
+                            context,
+                            '📅 Planlayıcı',
+                            'Ders planı ve haftalık program',
+                            Colors.indigo,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => ComprehensiveWeeklyPlannerScreen()),
+                            ),
+                          ),
                         ),
-                      ),
-                      _buildMenuCard(
-                        context,
-                        '📝 Ödev Takibi',
-                        'Ödevlerini yönet ve takip et',
-                        Colors.green,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HomeworkScreen()),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildMenuCard(
+                            context,
+                            '🎯 Başarılar',
+                            'Kazandığın rozetleri gör',
+                            Colors.purple,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AchievementsScreen()),
+                            ),
+                          ),
                         ),
-                      ),
-                      _buildMenuCard(
-                        context,
-                        '🎯 Başarılar',
-                        'Kazandığın rozetleri gör',
-                        Colors.purple,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AchievementsScreen()),
-                        ),
-                      ),
-                      _buildMenuCard(
-                        context,
-                        '📋 Haftalık',
-                        'Hafta planı',
-                        Colors.orange,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const WeeklyScheduleGeneratorScreen()),
-                        ),
-                      ),
-                      _buildMenuCard(
-                        context,
-                        '📆 Planlayıcı',
-                        'Haftalık çoklu plan',
-                        Colors.indigo,
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ComprehensiveWeeklyPlannerScreen()),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
 
                   // Motivasyon mesajı
@@ -219,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
@@ -234,23 +203,31 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              Flexible(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withOpacity(0.9),
+              const SizedBox(height: 4),
+              Flexible(
+                child: Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
