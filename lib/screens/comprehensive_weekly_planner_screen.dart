@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../models/study_plan.dart';
 import '../models/homework.dart';
 import '../models/weekly_schedule_config.dart';
@@ -22,6 +25,7 @@ class _ComprehensiveWeeklyPlannerScreenState
   late WeeklyScheduleConfig _config;
   bool _isConfigExpanded = false;
   bool _isAddingNewItem = false;
+  bool _showWeeklyGrid = false;
 
   // Konfigürasyon kontrolleri
   late List<bool> _selectedDays;
@@ -143,6 +147,13 @@ class _ComprehensiveWeeklyPlannerScreenState
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.purple.shade400,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.print),
+            tooltip: 'Programı Yazdır',
+            onPressed: _exportSchedulePdf,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -153,25 +164,32 @@ class _ComprehensiveWeeklyPlannerScreenState
             // Takvim
             _buildCalendarSection(),
 
-            // Seçili Gün Detayları
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${DateFormat('EEEE, d MMMM y', 'tr_TR').format(_selectedDay)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.purple.shade700,
+            // Görünüm değiştirici
+            _buildViewToggle(),
+            SizedBox(height: 8),
+
+            // Haftalık tablo veya günlük detay
+            if (_showWeeklyGrid)
+              _buildWeeklyGridView()
+            else
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${DateFormat('EEEE, d MMMM y', 'tr_TR').format(_selectedDay)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple.shade700,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  _buildDayDetails(),
-                ],
+                    SizedBox(height: 12),
+                    _buildDayDetails(),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -181,6 +199,481 @@ class _ComprehensiveWeeklyPlannerScreenState
         child: Icon(Icons.add),
         tooltip: 'Ders / Ödev Ekle',
       ),
+    );
+  }
+
+  String _fmtTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  DateTime _getWeekStart(DateTime day) =>
+      DateTime(day.year, day.month, day.day)
+          .subtract(Duration(days: day.weekday - 1));
+
+  Widget _buildViewToggle() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _showWeeklyGrid = false),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: !_showWeeklyGrid
+                      ? Colors.purple.shade400
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    '📋 Günlük',
+                    style: TextStyle(
+                      color: !_showWeeklyGrid
+                          ? Colors.white
+                          : Colors.grey.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _showWeeklyGrid = true),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _showWeeklyGrid
+                      ? Colors.purple.shade400
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    '📊 Haftalık Tablo',
+                    style: TextStyle(
+                      color: _showWeeklyGrid
+                          ? Colors.white
+                          : Colors.grey.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyGridView() {
+    final weekStart = _getWeekStart(_focusedDay);
+    final days = List.generate(7, (i) => weekStart.add(Duration(days: i)));
+    final dayLabels = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+    final plans = context.watch<StudyPlanProvider>().studyPlans;
+
+    // Haftanın planlarını grupla
+    Map<int, List<StudyPlan>> weekPlans = {};
+    for (int i = 0; i < 7; i++) {
+      weekPlans[i] = plans
+          .where((p) => isSameDay(p.date, days[i]))
+          .toList()
+        ..sort((a, b) => (a.startTime.hour * 60 + a.startTime.minute)
+            .compareTo(b.startTime.hour * 60 + b.startTime.minute));
+    }
+
+    // Saat aralığını belirle
+    int minHour = 8;
+    int maxHour = 18;
+    for (var dayPlans in weekPlans.values) {
+      for (var plan in dayPlans) {
+        if (plan.startTime.hour < minHour) minHour = plan.startTime.hour;
+        if (plan.endTime.hour >= maxHour) {
+          maxHour = plan.endTime.hour + (plan.endTime.minute > 0 ? 1 : 0);
+        }
+      }
+    }
+    if (maxHour <= minHour) maxHour = minHour + 1;
+
+    final hours = List.generate(maxHour - minHour, (i) => minHour + i);
+    const double timeColWidth = 46;
+    const double dayColWidth = 80;
+    const double rowHeight = 52;
+
+    return Container(
+      margin: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: timeColWidth + 7 * dayColWidth,
+          child: Column(
+            children: [
+              // Başlık satırı
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.purple.shade500, Colors.purple.shade700],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: timeColWidth,
+                      height: 48,
+                      child: Center(
+                        child: Text('⏰', style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    ...List.generate(7, (i) {
+                      final isToday = isSameDay(days[i], DateTime.now());
+                      return Container(
+                        width: dayColWidth,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: isToday
+                              ? Colors.white.withOpacity(0.15)
+                              : null,
+                          border: Border(
+                            left: BorderSide(
+                                color: Colors.white.withOpacity(0.15)),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              dayLabels[i],
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              DateFormat('d/M').format(days[i]),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              // Saat satırları
+              ...hours.map((hour) {
+                return Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Saat etiketi
+                      Container(
+                        width: timeColWidth,
+                        height: rowHeight,
+                        alignment: Alignment.topCenter,
+                        padding: EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          border: Border(
+                            right: BorderSide(color: Colors.grey.shade300),
+                          ),
+                        ),
+                        child: Text(
+                          '${hour.toString().padLeft(2, '0')}:00',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      // Gün sütunları
+                      ...List.generate(7, (dayIndex) {
+                        final dayPlansList = weekPlans[dayIndex]!;
+                        final matchingPlans = dayPlansList.where((p) {
+                          final pStart =
+                              p.startTime.hour * 60 + p.startTime.minute;
+                          final pEnd =
+                              p.endTime.hour * 60 + p.endTime.minute;
+                          final slotStart = hour * 60;
+                          final slotEnd = (hour + 1) * 60;
+                          return pStart < slotEnd && pEnd > slotStart;
+                        }).toList();
+
+                        if (matchingPlans.isEmpty) {
+                          return Container(
+                            width: dayColWidth,
+                            height: rowHeight,
+                            decoration: BoxDecoration(
+                              border: Border(
+                                left: BorderSide(
+                                    color: Colors.grey.shade200),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final plan = matchingPlans.first;
+                        final color =
+                            _subjectColors[plan.subject] ?? Colors.grey;
+                        final isStart = plan.startTime.hour == hour;
+
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedDay = plan.date;
+                              _focusedDay = plan.date;
+                              _showWeeklyGrid = false;
+                            });
+                          },
+                          child: Container(
+                            width: dayColWidth,
+                            height: rowHeight,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.15),
+                              border: Border(
+                                left: BorderSide(
+                                    color: Colors.grey.shade200),
+                                top: isStart
+                                    ? BorderSide(
+                                        color: color, width: 2)
+                                    : BorderSide.none,
+                              ),
+                            ),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            child: isStart
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        plan.subject,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: color,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      SizedBox(height: 1),
+                                      Text(
+                                        '${_fmtTime(plan.startTime)}-${_fmtTime(plan.endTime)}',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Center(
+                                    child: Container(
+                                      width: 4,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: color.withOpacity(0.4),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              }),
+              // Boş planlar için mesaj
+              if (weekPlans.values.every((plans) => plans.isEmpty))
+                Container(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      '📝 Bu hafta için plan yok\n⚙️ Ayarlardan haftalık plan oluşturabilirsin',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportSchedulePdf() async {
+    final weekStart = _getWeekStart(_focusedDay);
+    final days = List.generate(7, (i) => weekStart.add(Duration(days: i)));
+    final dayLabels = [
+      'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'
+    ];
+    final plans = context.read<StudyPlanProvider>().studyPlans;
+
+    Map<int, List<StudyPlan>> weekPlans = {};
+    for (int i = 0; i < 7; i++) {
+      weekPlans[i] = plans
+          .where((p) => isSameDay(p.date, days[i]))
+          .toList()
+        ..sort((a, b) => (a.startTime.hour * 60 + a.startTime.minute)
+            .compareTo(b.startTime.hour * 60 + b.startTime.minute));
+    }
+
+    final pdf = pw.Document();
+    final weekRange =
+        '${DateFormat('d MMMM', 'tr_TR').format(days[0])} - ${DateFormat('d MMMM y', 'tr_TR').format(days[6])}';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: pw.EdgeInsets.all(24),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('StudyGo - Haftalık Ders Programı',
+                      style: pw.TextStyle(
+                          fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(weekRange,
+                      style: pw.TextStyle(
+                          fontSize: 11, color: PdfColors.grey600)),
+                ],
+              ),
+              pw.SizedBox(height: 12),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                columnWidths: {
+                  0: pw.FixedColumnWidth(50),
+                  for (int i = 1; i <= 7; i++)
+                    i: pw.FlexColumnWidth(),
+                },
+                children: [
+                  // Başlık satırı
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#7B1FA2')),
+                    children: [
+                      pw.Container(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Saat',
+                            style: pw.TextStyle(
+                                color: PdfColors.white,
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: 9)),
+                      ),
+                      ...List.generate(
+                          7,
+                          (i) => pw.Container(
+                                padding: pw.EdgeInsets.all(5),
+                                alignment: pw.Alignment.center,
+                                child: pw.Text(
+                                  '${dayLabels[i]}\n${DateFormat('d/M').format(days[i])}',
+                                  style: pw.TextStyle(
+                                      color: PdfColors.white,
+                                      fontWeight: pw.FontWeight.bold,
+                                      fontSize: 8),
+                                  textAlign: pw.TextAlign.center,
+                                ),
+                              )),
+                    ],
+                  ),
+                  // Saat satırları
+                  ...List.generate(13, (hourIdx) {
+                    final hour = 8 + hourIdx;
+                    return pw.TableRow(
+                      decoration: hourIdx % 2 == 0
+                          ? pw.BoxDecoration(color: PdfColors.grey50)
+                          : null,
+                      children: [
+                        pw.Container(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                              '${hour.toString().padLeft(2, '0')}:00',
+                              style: pw.TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: pw.FontWeight.bold)),
+                        ),
+                        ...List.generate(7, (dayIdx) {
+                          final matching = weekPlans[dayIdx]!.where((p) {
+                            final pStart =
+                                p.startTime.hour * 60 + p.startTime.minute;
+                            final pEnd =
+                                p.endTime.hour * 60 + p.endTime.minute;
+                            return pStart < (hour + 1) * 60 &&
+                                pEnd > hour * 60;
+                          }).toList();
+
+                          if (matching.isEmpty) {
+                            return pw.Container(
+                                padding: pw.EdgeInsets.all(4));
+                          }
+
+                          final plan = matching.first;
+                          final isStart = plan.startTime.hour == hour;
+                          return pw.Container(
+                            padding: pw.EdgeInsets.all(4),
+                            color: PdfColor.fromHex('#E1BEE7'),
+                            child: isStart
+                                ? pw.Text(
+                                    '${plan.subject}\n${_fmtTime(plan.startTime)}-${_fmtTime(plan.endTime)}',
+                                    style: pw.TextStyle(fontSize: 7),
+                                  )
+                                : pw.Center(
+                                    child: pw.Text('↓',
+                                        style: pw.TextStyle(
+                                            fontSize: 7,
+                                            color: PdfColors.grey))),
+                          );
+                        }),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
     );
   }
 
