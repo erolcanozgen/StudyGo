@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
-import '../providers/study_plan_provider.dart';
-import '../providers/homework_provider.dart';
 import '../providers/user_stats_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -31,31 +26,6 @@ class SettingsScreen extends StatelessWidget {
               _NotificationSetting(
                 title: 'Ödev Hatırlatmaları',
                 subtitle: 'Ödev teslim tarihinden 1 gün önce hatırlat',
-              ),
-            ],
-          ),
-
-          // Veri yönetimi
-          _SettingsSection(
-            title: '💾 Veri Yönetimi',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.print),
-                title: const Text('Ders Programını Yazdır'),
-                subtitle: const Text('Mevcut haftanın ders programını PDF olarak dışa aktar'),
-                onTap: () => _exportStudySchedule(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.description),
-                title: const Text('Ödev Listesini Yazdır'),
-                subtitle: const Text('Tüm ödevleri PDF olarak dışa aktar'),
-                onTap: () => _exportHomeworkList(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.analytics),
-                title: const Text('İstatistik Raporu'),
-                subtitle: const Text('Çalışma istatistiklerini PDF olarak dışa aktar'),
-                onTap: () => _exportStatisticsReport(context),
               ),
             ],
           ),
@@ -99,146 +69,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _exportStudySchedule(BuildContext context) async {
-    final planProvider = context.read<StudyPlanProvider>();
-    await planProvider.loadStudyPlans();
-
-    final fontRegular = await PdfGoogleFonts.notoSansRegular();
-    final fontBold = await PdfGoogleFonts.notoSansBold();
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('StudyGo - Ders Programı',
-                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 20),
-              ...planProvider.studyPlans.map((plan) {
-                return pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 10),
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(),
-                    borderRadius: pw.BorderRadius.circular(5),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(plan.subject,
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(plan.description),
-                      pw.Text(
-                          '${_formatTime(plan.startTime)} - ${_formatTime(plan.endTime)}'),
-                      pw.Text(plan.date.toString().split(' ')[0]),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
-
-  Future<void> _exportHomeworkList(BuildContext context) async {
-    final homeworkProvider = context.read<HomeworkProvider>();
-    await homeworkProvider.loadHomeworks();
-
-    final fontRegular = await PdfGoogleFonts.notoSansRegular();
-    final fontBold = await PdfGoogleFonts.notoSansBold();
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('StudyGo - Ödev Listesi',
-                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 20),
-              ...homeworkProvider.homeworks.map((homework) {
-                return pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 10),
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(),
-                    borderRadius: pw.BorderRadius.circular(5),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(homework.subject,
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(homework.description),
-                      pw.Text('Teslim: ${homework.dueDate.toString().split(' ')[0]}'),
-                      pw.Text('Durum: ${homework.isCompleted ? 'Tamamlandı' : 'Bekliyor'}'),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
-
-  Future<void> _exportStatisticsReport(BuildContext context) async {
-    final statsProvider = context.read<UserStatsProvider>();
-    await statsProvider.loadUserStats();
-
-    final fontRegular = await PdfGoogleFonts.notoSansRegular();
-    final fontBold = await PdfGoogleFonts.notoSansBold();
-    final pdf = pw.Document();
-    final stats = statsProvider.userStats;
-
-    pdf.addPage(
-      pw.Page(
-        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('StudyGo - İstatistik Raporu',
-                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 20),
-              pw.Text('Toplam Puan: ${stats.totalPoints}'),
-              pw.Text('Tamamlanan Plan: ${stats.completedPlans}'),
-              pw.Text('Tamamlanan Ödev: ${stats.completedHomeworks}'),
-              pw.Text('Mevcut Seri: ${stats.currentStreak}'),
-              pw.Text('En İyi Seri: ${stats.bestStreak}'),
-              pw.SizedBox(height: 20),
-              pw.Text('Kazanılan Başarılar:',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              ...statsProvider.unlockedAchievements.map((achievement) {
-                return pw.Text('• ${achievement.title}');
-              }),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
-
   void _showDeleteAllDataDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -266,12 +96,6 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatTime(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 }
 
