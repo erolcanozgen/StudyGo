@@ -444,7 +444,19 @@ class _ComprehensiveWeeklyPlannerScreenState
                         final plan = matchingPlans.first;
                         final color =
                             _subjectColors[plan.subject] ?? Colors.grey;
-                        final isStart = plan.startTime.hour == hour;
+
+                        // Bu plan bu saat diliminde ilk defa mı görünüyor?
+                        bool isFirstSlot = true;
+                        if (hour > minHour) {
+                          final prevMatching = dayPlansList.where((p) {
+                            final pS = p.startTime.hour * 60 + p.startTime.minute;
+                            final pE = p.endTime.hour * 60 + p.endTime.minute;
+                            return pS < hour * 60 && pE > (hour - 1) * 60;
+                          }).toList();
+                          if (prevMatching.isNotEmpty && prevMatching.first.id == plan.id) {
+                            isFirstSlot = false;
+                          }
+                        }
 
                         return GestureDetector(
                           onTap: () {
@@ -462,7 +474,7 @@ class _ComprehensiveWeeklyPlannerScreenState
                               border: Border(
                                 left: BorderSide(
                                     color: Colors.grey.shade200),
-                                top: isStart
+                                top: isFirstSlot
                                     ? BorderSide(
                                         color: color, width: 2)
                                     : BorderSide.none,
@@ -470,7 +482,7 @@ class _ComprehensiveWeeklyPlannerScreenState
                             ),
                             padding: EdgeInsets.symmetric(
                                 horizontal: 4, vertical: 2),
-                            child: isStart
+                            child: isFirstSlot
                                 ? Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -539,7 +551,7 @@ class _ComprehensiveWeeklyPlannerScreenState
     final weekStart = _getWeekStart(_focusedDay);
     final days = List.generate(7, (i) => weekStart.add(Duration(days: i)));
     final dayLabels = [
-      'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'
+      'Pazartesi', 'Sali', 'Carsamba', 'Persembe', 'Cuma', 'Cumartesi', 'Pazar'
     ];
     final plans = context.read<StudyPlanProvider>().studyPlans;
 
@@ -552,6 +564,10 @@ class _ComprehensiveWeeklyPlannerScreenState
             .compareTo(b.startTime.hour * 60 + b.startTime.minute));
     }
 
+    // Türkçe karakter destekleyen font yükle
+    final fontRegular = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+
     final pdf = pw.Document();
     final weekRange =
         '${DateFormat('d MMMM', 'tr_TR').format(days[0])} - ${DateFormat('d MMMM y', 'tr_TR').format(days[6])}';
@@ -560,6 +576,7 @@ class _ComprehensiveWeeklyPlannerScreenState
       pw.Page(
         pageFormat: PdfPageFormat.a4.landscape,
         margin: pw.EdgeInsets.all(24),
+        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -645,17 +662,29 @@ class _ComprehensiveWeeklyPlannerScreenState
                           }
 
                           final plan = matching.first;
-                          final isStart = plan.startTime.hour == hour;
+                          // Önceki saatte aynı plan birincil miydi?
+                          bool isFirstSlot = true;
+                          if (hour > 8) {
+                            final prevMatching = weekPlans[dayIdx]!.where((p) {
+                              final pS = p.startTime.hour * 60 + p.startTime.minute;
+                              final pE = p.endTime.hour * 60 + p.endTime.minute;
+                              return pS < hour * 60 && pE > (hour - 1) * 60;
+                            }).toList();
+                            if (prevMatching.isNotEmpty && prevMatching.first.id == plan.id) {
+                              isFirstSlot = false;
+                            }
+                          }
+
                           return pw.Container(
                             padding: pw.EdgeInsets.all(4),
                             color: PdfColor.fromHex('#E1BEE7'),
-                            child: isStart
+                            child: isFirstSlot
                                 ? pw.Text(
                                     '${plan.subject}\n${_fmtTime(plan.startTime)}-${_fmtTime(plan.endTime)}',
                                     style: pw.TextStyle(fontSize: 7),
                                   )
                                 : pw.Center(
-                                    child: pw.Text('↓',
+                                    child: pw.Text('...',
                                         style: pw.TextStyle(
                                             fontSize: 7,
                                             color: PdfColors.grey))),

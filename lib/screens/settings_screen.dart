@@ -103,10 +103,13 @@ class SettingsScreen extends StatelessWidget {
     final planProvider = context.read<StudyPlanProvider>();
     await planProvider.loadStudyPlans();
 
+    final fontRegular = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
     final pdf = pw.Document();
 
     pdf.addPage(
       pw.Page(
+        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -150,10 +153,13 @@ class SettingsScreen extends StatelessWidget {
     final homeworkProvider = context.read<HomeworkProvider>();
     await homeworkProvider.loadHomeworks();
 
+    final fontRegular = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
     final pdf = pw.Document();
 
     pdf.addPage(
       pw.Page(
+        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -196,11 +202,14 @@ class SettingsScreen extends StatelessWidget {
     final statsProvider = context.read<UserStatsProvider>();
     await statsProvider.loadUserStats();
 
+    final fontRegular = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
     final pdf = pw.Document();
     final stats = statsProvider.userStats;
 
     pdf.addPage(
       pw.Page(
+        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
